@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>English Class Monitor & Study Notebook</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- Topbar / Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🇬🇧</div>
+      <div class="brand-text">
+        <h1>English Class Monitor</h1>
+        <p>Captura de Slides & Transcrição Inteligente com Whisper GPU</p>
+      </div>
+    </div>
+
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="recorder-tab">🎙️ Gravador de Aula</button>
+      <button class="tab-btn" data-tab="lessons-tab">📚 Minhas Aulas</button>
+      <button class="tab-btn" data-tab="notebook-tab">📖 Caderno de Estudos</button>
+    </nav>
+
+    <div class="header-status">
+      <div class="status-pill" id="header-status-pill">
+        <span class="pulse-dot"></span>
+        <span id="status-text">Pronto</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Conteúdo Principal -->
+  <main>
+
+    <!-- ABA 1: GRAVADOR DE AULA -->
+    <section class="tab-pane active" id="recorder-tab">
+      
+      <!-- Banner de Processamento de IA -->
+      <div class="processing-alert" id="processing-banner" style="display: none;">
+        <div class="spinner"></div>
+        <div>
+          <strong>Processando Aula com Inteligência Artificial:</strong>
+          <span id="processing-msg">Transcrevendo áudio com Whisper (GPU)...</span>
+        </div>
+      </div>
+
+      <div class="recorder-grid" style="margin-top: 1.5rem;">
+        
+        <!-- Painel de Controle Principal -->
+        <div class="card recorder-hero">
+          <div>
+            <div class="input-group">
+              <label class="input-label" for="lesson-title-input">Nome ou Assunto da Aula (Opcional):</label>
+              <input type="text" id="lesson-title-input" class="styled-input" placeholder="Ex: Lesson 12 - Job Interviews & Phrasal Verbs">
+            </div>
+
+            <div class="timer-display">
+              <div class="timer-digits" id="timer-digits">00:00</div>
+              <div class="timer-tag">Tempo Decorrido</div>
+            </div>
+
+            <div class="audio-meter-box">
+              <div class="meter-header">
+                <span>🔊 Atividade do Microfone & Áudio do Zoom</span>
+                <span>WASAPI Loopback + Mic</span>
+              </div>
+              <div class="meter-bar-track">
+                <div class="meter-bar-fill" id="meter-fill"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="controls-row">
+            <button class="btn-record-main" id="btn-record" onclick="toggleRecording()">
+              <span>🔴</span> Iniciar Gravação da Aula
+            </button>
+            <button class="btn-snap-now" id="btn-snap-now" onclick="triggerCaptureNow()" disabled title="Capturar slide imediatamente">
+              <span>📸</span> Capturar Slide Agora
+            </button>
+          </div>
+        </div>
+
+        <!-- Painel de Preview de Slide em Tempo Real -->
+        <div class="card preview-panel">
+          <div class="preview-title">
+            <span>Último Slide Capturado</span>
+            <span class="preview-badge" id="slide-count-badge">0 slides</span>
+          </div>
+
+          <div class="slide-frame">
+            <div class="slide-placeholder" id="slide-placeholder">
+              <span>🖼️</span>
+              <p>Os slides da aula aparecerão aqui automaticamente quando mudarem.</p>
+            </div>
+            <img id="preview-slide-img" src="" alt="Último Slide" style="display: none;">
+          </div>
+
+          <div class="preview-meta">
+            <span>Detecção inteligente de troca de lousa/slides</span>
+            <span>Monitor Primário</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Legendas ao vivo + Tradutor -->
+      <div class="live-grid">
+        <div class="card live-card">
+          <div class="preview-title">
+            <span>💬 Legendas ao Vivo (Whisper GPU)</span>
+            <span class="preview-badge" id="live-status-badge">Aguardando aula</span>
+          </div>
+          <div class="live-captions" id="live-captions">
+            <p class="live-empty">As falas aparecerão aqui em tempo real durante a gravação. Clique numa frase para traduzi-la.</p>
+          </div>
+          <div class="preview-meta">
+            <label style="cursor:pointer;"><input type="checkbox" id="live-autoscroll" checked> Rolagem automática</label>
+            <button class="btn-action" onclick="clearLiveCaptions()">🧹 Limpar tela</button>
+          </div>
+        </div>
+
+        <div class="card translator-card">
+          <div class="preview-title">
+            <span>🌐 Tradutor Rápido</span>
+            <select id="translate-direction" class="styled-input" style="width:auto; padding:0.3rem 0.5rem;" onchange="runTranslate()">
+              <option value="auto">Automático (EN ⇄ PT)</option>
+              <option value="en-pt">Inglês → Português</option>
+              <option value="pt-en">Português → Inglês</option>
+            </select>
+          </div>
+          <textarea id="translate-input" class="styled-input" rows="4" placeholder="Digite uma palavra ou frase... (Ctrl+Enter para traduzir)"></textarea>
+          <div class="translate-actions">
+            <button class="btn-record-main" style="padding:0.5rem 1.1rem; font-size:0.9rem;" onclick="runTranslate()">Traduzir</button>
+            <button class="btn-action" onclick="copyTranslation()">📋 Copiar</button>
+            <button class="btn-action" onclick="swapTranslation()">⇄ Inverter</button>
+          </div>
+          <div class="translate-result" id="translate-result"><span style="color: var(--text-dim);">A tradução aparecerá aqui.</span></div>
+          <div class="translate-meta" id="translate-meta"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 2: MINHAS AULAS (HISTÓRICO) -->
+    <section class="tab-pane" id="lessons-tab">
+      <div class="lessons-header">
+        <h2>Aulas Gravadas</h2>
+        <button class="btn-snap-now" onclick="loadLessons()">
+          <span>🔄</span> Atualizar Lista
+        </button>
+      </div>
+
+      <div class="lessons-grid" id="lessons-grid">
+        <!-- Renderizado dinamicamente via app.js -->
+      </div>
+    </section>
+
+    <!-- ABA 3: CADERNO DE ESTUDOS INTELIGENTE -->
+    <section class="tab-pane" id="notebook-tab">
+      
+      <div class="notebook-header">
+        <div>
+          <h2 id="notebook-title">Selecione uma Aula</h2>
+          <p id="notebook-meta" style="color: var(--text-muted); font-size: 0.9rem; margin-top: 0.25rem;"></p>
+        </div>
+        <div class="notebook-controls">
+          <button class="btn-snap-now" onclick="regenerateAiMaterial()">
+            <span>✨</span> Regenerar com Ollama
+          </button>
+          <button class="btn-record-main" style="background: var(--accent-indigo); padding: 0.65rem 1.25rem; font-size: 0.9rem;" onclick="exportMarkdown()">
+            <span>📥</span> Exportar Markdown (Obsidian/Notion)
+          </button>
+        </div>
+      </div>
+
+      <!-- Player de Áudio Sincronizado -->
+      <div class="audio-player-card" style="display: none;">
+        <span style="font-size: 1.5rem;">🎧</span>
+        <div style="flex: 1;">
+          <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.35rem;">Gravação de Áudio da Aula (Clique em qualquer minuto para navegar)</div>
+          <audio id="lesson-audio-player" controls preload="metadata"></audio>
+        </div>
+      </div>
+
+      <!-- Resumo & Vocabulário IA -->
+      <div class="ai-summary-grid">
+        
+        <!-- Cartão de Resumo -->
+        <div class="ai-card">
+          <div class="ai-card-title">
+            <span>💡</span> Resumo Didático da Aula
+          </div>
+          <div class="summary-content" id="notebook-summary">
+            Nenhuma aula selecionada.
+          </div>
+
+          <div style="margin-top: 1.5rem; display: none;">
+            <div class="ai-card-title" style="margin-bottom: 0.5rem; color: #a7f3d0;">
+              <span>✍️</span> Gramática & Dicas
+            </div>
+            <div class="summary-content" id="notebook-grammar" style="font-size: 0.88rem;"></div>
+          </div>
+        </div>
+
+        <!-- Cartão de Vocabulário -->
+        <div class="ai-card">
+          <div class="ai-card-title">
+            <span>🔤</span> Vocabulário & Expressões-Chave da Aula
+          </div>
+          <div class="vocab-pills" id="notebook-vocab">
+            <p style="color: var(--text-dim);">Selecione uma aula no histórico para visualizar o vocabulário.</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Linha do Tempo Sincronizada: Slide + Fala -->
+      <div class="timeline-section">
+        <h3>📸 Caderno Visual & Transcrição Sincronizada</h3>
+        <div class="timeline-cards" id="notebook-timeline">
+          <!-- Renderizado dinamicamente -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Container de Toasts -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
