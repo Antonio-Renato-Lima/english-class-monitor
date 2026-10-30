@@ -228,7 +228,7 @@ def _ollama_batch(lines: List[str]) -> List[str]:
     return [str(i).strip() for i in items]
 
 
-def translate_batch(lines: List[str], progress=None, on_block=None) -> List[str]:
+def translate_batch(lines: List[str], progress=None, on_block=None, on_status=None) -> List[str]:
     """Traduz EN->PT uma lista de linhas, preservando a ordem. Falhas viram string vazia."""
     global _google_blocked_until
     results = [""] * len(lines)
@@ -250,19 +250,30 @@ def translate_batch(lines: List[str], progress=None, on_block=None) -> List[str]
         if on_block:
             on_block(n + 1, len(chunks), batch)
 
+        def status(engine, notice=""):
+            if on_status:
+                on_status(engine, notice)
+
         if time.time() >= _google_blocked_until:
+            status("google")
             try:
                 out = _google_batch(batch)
             except Exception as e:
+                reason = "Google recusou (limite de requisições 429)" if "429" in str(e) else "Google falhou"
                 if "429" in str(e):
                     _google_blocked_until = time.time() + 90
-                print(f"[Translator] Lote {n + 1}/{len(chunks)}: Google falhou ({e})")
+                print(f"[Translator] Lote {n + 1}/{len(chunks)}: {reason}. Tentando com Ollama...")
+                status("ollama", f"{reason}. Usando Ollama local neste bloco...")
+        else:
+            wait = int(_google_blocked_until - time.time())
+            status("ollama", f"Google em pausa por limite de requisições (volta em ~{wait}s). Usando Ollama local...")
 
         if out is None:
             try:
                 out = _ollama_batch(batch)
             except Exception as e:
                 print(f"[Translator] Lote {n + 1}/{len(chunks)}: Ollama falhou ({e})")
+                status("failed", "Ollama também não respondeu. Este bloco ficará sem tradução.")
 
         if out:
             for i, t in zip(idxs, out):

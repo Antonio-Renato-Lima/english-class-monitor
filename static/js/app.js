@@ -449,6 +449,20 @@ function updateJobOverlay(job) {
     const fill = document.getElementById("job-progress-fill");
     const stats = document.getElementById("job-stats");
     const preview = document.getElementById("job-preview");
+    const engineEl = document.getElementById("job-engine");
+
+    // Aviso do motor de tradução em uso (Google / fallback Ollama)
+    if (job.phase === "translating" && job.engine) {
+      const labels = {
+        google: "🌐 Traduzindo com Google Tradutor",
+        ollama: "⚠️ " + (job.notice || "Usando Ollama local"),
+        failed: "❌ " + (job.notice || "Falha ao traduzir este bloco")
+      };
+      engineEl.textContent = labels[job.engine] || "";
+      engineEl.className = `job-engine show ${job.engine}`;
+    } else {
+      engineEl.className = "job-engine";
+    }
 
     if (job.phase === "summarizing") {
       title.textContent = "Gerando resumo e vocabulário...";

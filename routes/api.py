@@ -36,7 +36,7 @@ _processing_stage = ""
 _job_lock = threading.Lock()
 _job = {
     "active": False, "lesson_id": None, "phase": "", "block": 0, "total_blocks": 0,
-    "lines_done": 0, "lines_total": 0, "preview": [],
+    "lines_done": 0, "lines_total": 0, "preview": [], "engine": "", "notice": "",
 }
 
 
@@ -59,7 +59,7 @@ def _translate_lesson_transcripts(lesson_id: int):
 
     _processing_stage = "Traduzindo transcrição para português..."
     _job_update(active=True, lesson_id=lesson_id, phase="translating", block=0, total_blocks=0,
-                lines_done=0, lines_total=len(pending), preview=[])
+                lines_done=0, lines_total=len(pending), preview=[], engine="", notice="")
 
     done_lines = {"n": 0}
 
@@ -69,7 +69,10 @@ def _translate_lesson_transcripts(lesson_id: int):
         _job_update(block=n, total_blocks=total, preview=batch[:6], lines_done=done_lines["n"])
         done_lines["n"] += len(batch)  # contado como concluído quando o próximo bloco iniciar
 
-    translations = translate_batch([t["text"] for t in pending], on_block=on_block)
+    def on_status(engine, notice):
+        _job_update(engine=engine, notice=notice)
+
+    translations = translate_batch([t["text"] for t in pending], on_block=on_block, on_status=on_status)
     update_transcript_translations([(t["id"], tr) for t, tr in zip(pending, translations)])
     _job_update(lines_done=len(pending))
 
