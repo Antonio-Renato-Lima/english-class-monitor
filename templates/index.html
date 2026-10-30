@@ -228,6 +228,19 @@
 
   </main>
 
+  <!-- Modal de confirmação -->
+  <div class="modal-overlay" id="confirm-modal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+      <div class="modal-icon" id="confirm-icon">🗑️</div>
+      <h3 id="confirm-title">Excluir aula?</h3>
+      <p id="confirm-message"></p>
+      <div class="modal-actions">
+        <button class="btn-action" id="confirm-cancel">Cancelar</button>
+        <button class="btn-record-main modal-danger" id="confirm-ok">Excluir</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Container de Toasts -->
   <div class="toast-container" id="toast-container"></div>
 

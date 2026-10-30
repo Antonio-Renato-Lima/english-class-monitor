@@ -194,6 +194,7 @@ async function loadLessons() {
   try {
     const res = await fetch("/api/lessons");
     const data = await res.json();
+    window.lessonsCache = data.lessons || [];
 
     if (!data.lessons || data.lessons.length === 0) {
       container.innerHTML = `
@@ -429,7 +430,14 @@ function exportMarkdown(lessonId) {
 
 // Excluir Aula
 async function deleteLessonPrompt(lessonId) {
-  if (!confirm("Tem certeza que deseja excluir esta aula e seus arquivos gravados?")) return;
+  const lesson = (window.lessonsCache || []).find(l => l.id === lessonId);
+  const name = lesson ? lesson.title : "esta aula";
+  const confirmed = await confirmDialog({
+    title: "Excluir aula?",
+    message: `<strong>${escapeHtml(name)}</strong><br>O áudio, os slides e a transcrição serão apagados permanentemente.`,
+    okText: "Excluir"
+  });
+  if (!confirmed) return;
   try {
     const res = await fetch(`/api/lessons/${lessonId}`, { method: "DELETE" });
     const data = await res.json();
@@ -583,3 +591,37 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) runTranslate();
   });
 });
+
+
+// ===== Modal de confirmação estilizado =====
+function confirmDialog({ title = "Confirmar", message = "", okText = "Confirmar", cancelText = "Cancelar" } = {}) {
+  return new Promise(resolve => {
+    const modal = document.getElementById("confirm-modal");
+    const okBtn = document.getElementById("confirm-ok");
+    const cancelBtn = document.getElementById("confirm-cancel");
+    document.getElementById("confirm-title").textContent = title;
+    document.getElementById("confirm-message").innerHTML = message;
+    okBtn.textContent = okText;
+    cancelBtn.textContent = cancelText;
+
+    const close = result => {
+      modal.classList.remove("open");
+      modal.setAttribute("aria-hidden", "true");
+      okBtn.onclick = cancelBtn.onclick = modal.onclick = null;
+      document.removeEventListener("keydown", onKey);
+      resolve(result);
+    };
+    const onKey = e => {
+      if (e.key === "Escape") close(false);
+    };
+
+    okBtn.onclick = () => close(true);
+    cancelBtn.onclick = () => close(false);
+    modal.onclick = e => { if (e.target === modal) close(false); };
+    document.addEventListener("keydown", onKey);
+
+    modal.classList.add("open");
+    modal.setAttribute("aria-hidden", "false");
+    cancelBtn.focus();
+  });
+}
