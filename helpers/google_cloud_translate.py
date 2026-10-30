@@ -99,3 +99,4 @@ def translate_texts(texts: List[str], source: str = "en", target: str = "pt") ->
     except Exception:
         _refund(chars)  # requisição não concluída: não consome cota
         raise
+
