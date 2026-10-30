@@ -1,3 +1,4 @@
+import time
 import httpx
 from typing import Dict, Any
 from config import OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL
@@ -28,12 +29,15 @@ def _ollama(text: str, source: str, target: str) -> str:
     )
     r = httpx.post(
         f"{OLLAMA_BASE_URL}/api/generate",
-        json={"model": DEFAULT_OLLAMA_MODEL, "prompt": prompt, "stream": False,
+        json={"model": DEFAULT_OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False,
               "options": {"temperature": 0.1}},
         timeout=60.0,
     )
     r.raise_for_status()
-    return r.json().get("response", "").strip()
+    out = r.json().get("response", "").strip()
+    if "</think>" in out:  # modelos com raciocínio (ex.: qwen3) podem emitir <think>...</think>
+        out = out.split("</think>", 1)[1].strip()
+    return out
 
 
 _PT_HINTS = {
@@ -58,17 +62,27 @@ def _mymemory(text: str, source: str, target: str) -> str:
         timeout=8.0,
     )
     r.raise_for_status()
-    out = r.json().get("responseData", {}).get("translatedText", "")
+    data = r.json()
+    out = data.get("responseData", {}).get("translatedText", "")
+    try:
+        score = float(data.get("responseData", {}).get("match", 0))
+    except (TypeError, ValueError):
+        score = 0.0
     if not out or "MYMEMORY WARNING" in out.upper():
         raise RuntimeError("MyMemory sem resposta válida")
+    if score < 0.85:
+        # A memória de tradução devolve frases sem relação quando a correspondência é fraca
+        raise RuntimeError(f"MyMemory com baixa confiança ({score:.2f})")
     return out
 
 
 _cache: Dict[tuple, Dict[str, Any]] = {}
+_google_blocked_until = 0.0
 
 
 def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
     """direction: 'auto' (pt->en / qualquer->pt), 'en-pt' ou 'pt-en'."""
+    global _google_blocked_until
     text = (text or "").strip()
     if not text:
         return {"translation": "", "source": "", "target": ""}
@@ -88,6 +102,8 @@ def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
 
     # 1) Google (endpoint não oficial; pode devolver 429)
     try:
+        if time.time() < _google_blocked_until:
+            raise RuntimeError("Google em pausa após limite de requisições (429)")
         res = _google(text, source, target)
         if direction == "auto" and res["detected"].startswith("pt"):
             source, target = "pt", "en"
@@ -98,28 +114,24 @@ def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
         _cache[key] = result
         return result
     except Exception as e:
+        if "429" in str(e):
+            _google_blocked_until = time.time() + 90
         errors.append(f"Google: {e}")
-        print(f"[Translator] Google falhou ({e}), tentando MyMemory...")
+        print(f"[Translator] Google falhou ({e}), tentando Ollama...")
 
     # Sem detecção do Google, deduz o idioma de origem
     if source == "auto":
         source = "pt" if _guess_is_pt(text) else "en"
     target = "en" if source == "pt" else "pt"
 
-    # 2) MyMemory (gratuito, sem chave)
-    try:
-        result = {"translation": _mymemory(text, source, target), "source": source, "target": target, "engine": "mymemory"}
-        _cache[key] = result
-        return result
-    except Exception as e:
-        errors.append(f"MyMemory: {e}")
-        print(f"[Translator] MyMemory falhou ({e}), tentando Ollama...")
-
-    # 3) Ollama local
+    # 2) Ollama local (melhor qualidade que a memória de tradução para frases curtas)
     try:
         result = {"translation": _ollama(text, source, target), "source": source, "target": target, "engine": "ollama"}
         _cache[key] = result
         return result
     except Exception as e:
         errors.append(f"Ollama: {e}")
-        raise RuntimeError("Nenhum tradutor disponível. " + " | ".join(errors))
+        raise RuntimeError(
+            "Nenhum tradutor disponível (o Google limitou as requisições e o Ollama não respondeu). "
+            "Inicie o Ollama ou tente novamente em instantes. " + " | ".join(errors)
+        )
