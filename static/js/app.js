@@ -379,7 +379,10 @@ function renderTimeline(aligned) {
     const speechLines = g.lines.map(line => `
       <div class="transcript-line">
         <span class="time-tag" onclick="seekAudio(${line.start_seconds})">${line.timestamp_str}</span>
-        <span class="spoken-text">${escapeHtml(line.text)}</span>
+        <div class="spoken-block">
+          <span class="spoken-text">${escapeHtml(line.text)}</span>
+          ${line.translation ? `<div class="line-translation">${escapeHtml(line.translation)}</div>` : ""}
+        </div>
       </div>
     `).join("");
 
@@ -406,7 +409,7 @@ function seekAudio(seconds) {
 // Regenerar IA para a aula atual
 async function regenerateAiMaterial() {
   if (!currentViewingLessonId) return;
-  showToast("Requisitando ao Ollama novo resumo e vocabulário...");
+  showToast("Gerando resumo, vocabulário e traduções... pode levar alguns instantes.");
   try {
     const res = await fetch(`/api/lessons/${currentViewingLessonId}/generate_ai`, { method: "POST" });
     const data = await res.json();

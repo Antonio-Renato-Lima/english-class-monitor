@@ -13,12 +13,13 @@ from helpers.database import (
     get_lesson_transcripts,
     get_lesson_screenshots,
     delete_lesson,
+    update_transcript_translations,
 )
 from helpers.audio_recorder import audio_recorder
 from helpers.screen_capture import screen_capture
 from helpers.transcriber import transcribe_audio_file
 from helpers.live_transcriber import live_transcriber
-from helpers.translator import translate
+from helpers.translator import translate, translate_batch
 from helpers.ollama_client import generate_study_material
 from helpers.utils.formatters import align_transcripts_with_screenshots, export_lesson_to_markdown
 
@@ -29,6 +30,22 @@ _session_lock = threading.Lock()
 _active_lesson_id = None
 _is_processing = False
 _processing_stage = ""
+
+
+def _translate_lesson_transcripts(lesson_id: int):
+    """Traduz para PT-BR as falas da aula que ainda não têm tradução."""
+    global _processing_stage
+    pending = [t for t in get_lesson_transcripts(lesson_id) if not t.get("translation")]
+    if not pending:
+        return
+
+    def on_progress(done, total):
+        global _processing_stage
+        _processing_stage = f"Traduzindo transcrição para português ({done}/{total})..."
+
+    _processing_stage = "Traduzindo transcrição para português..."
+    translations = translate_batch([t["text"] for t in pending], progress=on_progress)
+    update_transcript_translations([(t["id"], tr) for t, tr in zip(pending, translations)])
 
 
 def _process_lesson_background(lesson_id: int, audio_filename: str):
@@ -48,6 +65,11 @@ def _process_lesson_background(lesson_id: int, audio_filename: str):
                 save_transcripts(lesson_id, segments)
             except Exception as e:
                 print(f"[API Background] Erro na transcrição Whisper: {e}")
+
+        try:
+            _translate_lesson_transcripts(lesson_id)
+        except Exception as e:
+            print(f"[API Background] Erro ao traduzir transcrição: {e}")
 
         _processing_stage = "Gerando resumo e vocabulário com Ollama..."
         lesson = get_lesson(lesson_id)
@@ -274,6 +296,14 @@ def regenerate_ai_material(lesson_id: int):
     transcripts = get_lesson_transcripts(lesson_id)
     if not transcripts:
         return jsonify({"success": False, "message": "Aula não possui transcrições."}), 400
+
+    try:
+        _translate_lesson_transcripts(lesson_id)
+    except Exception as e:
+        print(f"[API] Erro ao traduzir transcrição: {e}")
+    finally:
+        global _processing_stage
+        _processing_stage = ""
 
     ai_data = generate_study_material(transcripts, lesson_title=lesson.get("title", "Aula de Inglês"))
     save_lesson_ai_analysis(

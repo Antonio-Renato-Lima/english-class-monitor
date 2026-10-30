@@ -58,6 +58,22 @@ def init_db():
     );
     """)
 
+    # Migração: coluna de tradução PT-BR por linha de transcrição
+    existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(transcripts)").fetchall()]
+    if "translation" not in existing_cols:
+        cursor.execute("ALTER TABLE transcripts ADD COLUMN translation TEXT")
+
+    conn.commit()
+    conn.close()
+
+
+def update_transcript_translations(translations: List[tuple]):
+    """Salva traduções. `translations` é uma lista de (transcript_id, texto_traduzido)."""
+    conn = get_connection()
+    conn.executemany(
+        "UPDATE transcripts SET translation = ? WHERE id = ?",
+        [(text, tid) for tid, text in translations if text],
+    )
     conn.commit()
     conn.close()
 

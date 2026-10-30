@@ -29,6 +29,7 @@ def align_transcripts_with_screenshots(
                 "timestamp_str": t["start_str"],
                 "start_seconds": t["start_seconds"],
                 "text": t["text"],
+                "translation": t.get("translation") or "",
                 "screenshot": None
             }
             for t in transcripts
@@ -50,6 +51,7 @@ def align_transcripts_with_screenshots(
             "start_seconds": t["start_seconds"],
             "end_seconds": t["end_seconds"],
             "text": t["text"],
+            "translation": t.get("translation") or "",
             "screenshot": matching_screen["filename"] if matching_screen else None,
             "screenshot_time": matching_screen["timestamp_str"] if matching_screen else None,
         })
@@ -113,5 +115,7 @@ def export_lesson_to_markdown(
             last_screen = curr_screen
 
         md.append(f"**[{item['timestamp_str']}]** {item['text']}")
+        if item.get("translation"):
+            md.append(f"> 🇧🇷 *{item['translation']}*")
 
     return "\n".join(md)
