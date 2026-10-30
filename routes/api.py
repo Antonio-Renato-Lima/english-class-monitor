@@ -20,6 +20,7 @@ from helpers.screen_capture import screen_capture
 from helpers.transcriber import transcribe_audio_file
 from helpers.live_transcriber import live_transcriber
 from helpers.translator import translate, translate_batch
+from helpers.google_cloud_translate import get_usage as google_usage
 from helpers.ollama_client import generate_study_material
 from helpers.utils.formatters import align_transcripts_with_screenshots, export_lesson_to_markdown
 
@@ -261,6 +262,11 @@ def live_captions():
         "status": live_transcriber.status,
         "captions": live_transcriber.get_captions(since),
     })
+
+
+@api_bp.route("/translate/usage", methods=["GET"])
+def translate_usage():
+    return jsonify({"success": True, **google_usage()})
 
 
 @api_bp.route("/translate", methods=["POST"])

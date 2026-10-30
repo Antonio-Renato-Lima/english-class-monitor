@@ -454,6 +454,8 @@ function updateJobOverlay(job) {
     // Aviso do motor de tradução em uso (Google / fallback Ollama)
     if (job.phase === "translating" && job.engine) {
       const labels = {
+        official: "✅ " + (job.notice || "Google Cloud Translation (oficial)"),
+        quota: "⚠️ " + (job.notice || "Usando tradutores gratuitos"),
         google: "🌐 Traduzindo com Google Tradutor",
         ollama: "⚠️ " + (job.notice || "Usando Ollama local"),
         failed: "❌ " + (job.notice || "Falha ao traduzir este bloco")
@@ -640,6 +642,7 @@ async function runTranslate() {
     if (data.success) {
       resultEl.textContent = data.translation;
       metaEl.textContent = `${(data.source || "").toUpperCase()} → ${(data.target || "").toUpperCase()} • ${data.engine}`;
+      loadTranslateQuota();
     } else {
       resultEl.textContent = "";
       showToast(data.message || "Falha ao traduzir.", "error");
@@ -707,3 +710,20 @@ function confirmDialog({ title = "Confirmar", message = "", okText = "Confirmar"
     cancelBtn.focus();
   });
 }
+
+
+// Cota mensal da API oficial do Google (só aparece se a chave estiver configurada)
+async function loadTranslateQuota() {
+  const el = document.getElementById("translate-quota");
+  if (!el) return;
+  try {
+    const res = await fetch("/api/translate/usage");
+    const u = await res.json();
+    if (u.enabled) {
+      el.textContent = `Cota Google oficial (${u.month}): ${u.used.toLocaleString("pt-BR")} / ${u.limit.toLocaleString("pt-BR")} caracteres`;
+    } else {
+      el.textContent = "";
+    }
+  } catch (e) { /* ignora */ }
+}
+document.addEventListener("DOMContentLoaded", loadTranslateQuota);

@@ -36,3 +36,7 @@ DEFAULT_OLLAMA_MODEL = os.getenv("DEFAULT_OLLAMA_MODEL", "qwen3:8b")
 SCREENSHOT_INTERVAL = int(os.getenv("SCREENSHOT_INTERVAL", 15))
 SLIDE_CHANGE_THRESHOLD = float(os.getenv("SLIDE_CHANGE_THRESHOLD", 0.04))
 MONITOR_INDEX = int(os.getenv("MONITOR_INDEX", 0))
+
+# Google Cloud Translation (API oficial) - opcional, com trava de cota mensal
+GOOGLE_TRANSLATE_API_KEY = os.getenv("GOOGLE_TRANSLATE_API_KEY", "").strip()
+GOOGLE_TRANSLATE_MONTHLY_LIMIT = int(os.getenv("GOOGLE_TRANSLATE_MONTHLY_LIMIT", 500000))

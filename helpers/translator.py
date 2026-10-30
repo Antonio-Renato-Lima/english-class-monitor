@@ -3,6 +3,7 @@ import time
 import httpx
 from typing import Dict, Any, List
 from config import OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL
+from helpers import google_cloud_translate as official
 
 _GOOGLE_URL = "https://translate.googleapis.com/translate_a/single"
 _LANG_NAMES = {"en": "English", "pt": "Brazilian Portuguese"}
@@ -143,6 +144,18 @@ def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
 
     errors = []
 
+    # 0) Google Cloud Translation oficial (com trava de cota). Só para direção explícita.
+    if direction != "auto" and official.is_enabled():
+        try:
+            out = official.translate_texts([text], source, target)[0]
+            result = {"translation": out, "source": source, "target": target, "engine": "google-oficial"}
+            _cache[key] = result
+            return result
+        except official.QuotaExceeded as e:
+            print(f"[Translator] {e}. Usando tradutores gratuitos.")
+        except Exception as e:
+            print(f"[Translator] API oficial falhou ({e}). Usando tradutores gratuitos.")
+
     # 1) Google (endpoint não oficial; pode devolver 429)
     try:
         if time.time() < _google_blocked_until:
@@ -254,7 +267,21 @@ def translate_batch(lines: List[str], progress=None, on_block=None, on_status=No
             if on_status:
                 on_status(engine, notice)
 
-        if time.time() >= _google_blocked_until:
+        if official.is_enabled():
+            try:
+                out = official.translate_texts(batch, "en", "pt")
+                u = official.get_usage()
+                status("official", f"Google Cloud Translation (oficial) - cota: {u['used']:,}/{u['limit']:,} caracteres")
+            except official.QuotaExceeded as e:
+                print(f"[Translator] {e}")
+                status("quota", f"{e}. Usando tradutores gratuitos...")
+            except Exception as e:
+                print(f"[Translator] API oficial falhou ({e}). Usando tradutores gratuitos.")
+                status("quota", "API oficial do Google falhou. Usando tradutores gratuitos...")
+
+        if out is not None:
+            pass
+        elif time.time() >= _google_blocked_until:
             status("google")
             try:
                 out = _google_batch(batch)
