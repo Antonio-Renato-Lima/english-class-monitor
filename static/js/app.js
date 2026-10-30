@@ -51,6 +51,7 @@ function startStatusPolling() {
 }
 
 function updateRecordingUI(status) {
+  updateJobOverlay(status.job);
   const statusPill = document.getElementById("header-status-pill");
   const statusText = document.getElementById("status-text");
   const btnRecord = document.getElementById("btn-record");
@@ -406,21 +407,85 @@ function seekAudio(seconds) {
   }
 }
 
-// Regenerar IA para a aula atual
+// Regenerar IA para a aula atual (roda em segundo plano; o overlay mostra o progresso)
 async function regenerateAiMaterial() {
   if (!currentViewingLessonId) return;
-  showToast("Gerando resumo, vocabulário e traduções... pode levar alguns instantes.");
   try {
     const res = await fetch(`/api/lessons/${currentViewingLessonId}/generate_ai`, { method: "POST" });
     const data = await res.json();
-    if (data.success) {
-      showToast("Material de estudo atualizado!");
-      openLessonNotebook(currentViewingLessonId);
-    } else {
+    if (!data.success) {
       showToast(data.message, "error");
+      return;
     }
+    jobDismissed = false;
+    // Mostra o overlay imediatamente, sem esperar o próximo ciclo de polling
+    updateJobOverlay({ active: true, phase: "translating", block: 0, total_blocks: 0, lines_done: 0, lines_total: 0, preview: [], lesson_id: currentViewingLessonId });
   } catch (e) {
     showToast("Erro ao reprocessar aula.", "error");
+  }
+}
+
+// ===== Overlay de progresso (tradução / resumo) =====
+let jobWasActive = false;
+let jobDismissed = false;
+let jobLessonId = null;
+
+function hideJobOverlay() {
+  jobDismissed = true;
+  const overlay = document.getElementById("job-overlay");
+  overlay.classList.remove("open");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function updateJobOverlay(job) {
+  if (!job) return;
+  const overlay = document.getElementById("job-overlay");
+
+  if (job.active) {
+    jobWasActive = true;
+    jobLessonId = job.lesson_id;
+    const title = document.getElementById("job-title");
+    const subtitle = document.getElementById("job-subtitle");
+    const fill = document.getElementById("job-progress-fill");
+    const stats = document.getElementById("job-stats");
+    const preview = document.getElementById("job-preview");
+
+    if (job.phase === "summarizing") {
+      title.textContent = "Gerando resumo e vocabulário...";
+      subtitle.textContent = "Quase pronto! O Ollama está montando o material de estudo.";
+      fill.classList.add("indeterminate");
+      stats.innerHTML = "";
+      preview.innerHTML = "";
+    } else {
+      title.textContent = "Traduzindo transcrição...";
+      subtitle.textContent = "Cada bloco de falas é traduzido para português.";
+      if (job.total_blocks > 0) {
+        fill.classList.remove("indeterminate");
+        const pct = Math.round(((job.block - 1) / job.total_blocks) * 100);
+        fill.style.width = `${Math.max(3, pct)}%`;
+        stats.innerHTML = `<span>Bloco ${job.block} de ${job.total_blocks}</span><span>${job.lines_done} de ${job.lines_total} falas</span>`;
+      } else {
+        fill.classList.add("indeterminate");
+        stats.innerHTML = "<span>Preparando...</span>";
+      }
+      preview.innerHTML = (job.preview || []).map(l => `<div class="job-preview-line">${escapeHtml(l)}</div>`).join("");
+    }
+
+    if (!jobDismissed) {
+      overlay.classList.add("open");
+      overlay.setAttribute("aria-hidden", "false");
+    }
+  } else if (jobWasActive) {
+    // Terminou: fecha o overlay e atualiza o caderno
+    jobWasActive = false;
+    jobDismissed = false;
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden", "true");
+    showToast("Tradução e material de estudo atualizados!");
+    loadLessons();
+    if (currentViewingLessonId && currentViewingLessonId === jobLessonId) {
+      openLessonNotebook(currentViewingLessonId);
+    }
   }
 }
 

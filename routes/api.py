@@ -32,6 +32,24 @@ _is_processing = False
 _processing_stage = ""
 
 
+# Estado do trabalho de tradução/regeneração (exibido no overlay do front-end)
+_job_lock = threading.Lock()
+_job = {
+    "active": False, "lesson_id": None, "phase": "", "block": 0, "total_blocks": 0,
+    "lines_done": 0, "lines_total": 0, "preview": [],
+}
+
+
+def _job_update(**kwargs):
+    with _job_lock:
+        _job.update(kwargs)
+
+
+def _job_snapshot():
+    with _job_lock:
+        return dict(_job)
+
+
 def _translate_lesson_transcripts(lesson_id: int):
     """Traduz para PT-BR as falas da aula que ainda não têm tradução."""
     global _processing_stage
@@ -39,13 +57,50 @@ def _translate_lesson_transcripts(lesson_id: int):
     if not pending:
         return
 
-    def on_progress(done, total):
-        global _processing_stage
-        _processing_stage = f"Traduzindo transcrição para português ({done}/{total})..."
-
     _processing_stage = "Traduzindo transcrição para português..."
-    translations = translate_batch([t["text"] for t in pending], progress=on_progress)
+    _job_update(active=True, lesson_id=lesson_id, phase="translating", block=0, total_blocks=0,
+                lines_done=0, lines_total=len(pending), preview=[])
+
+    done_lines = {"n": 0}
+
+    def on_block(n, total, batch):
+        global _processing_stage
+        _processing_stage = f"Traduzindo transcrição para português (bloco {n}/{total})..."
+        _job_update(block=n, total_blocks=total, preview=batch[:6], lines_done=done_lines["n"])
+        done_lines["n"] += len(batch)  # contado como concluído quando o próximo bloco iniciar
+
+    translations = translate_batch([t["text"] for t in pending], on_block=on_block)
     update_transcript_translations([(t["id"], tr) for t, tr in zip(pending, translations)])
+    _job_update(lines_done=len(pending))
+
+
+def _regenerate_background(lesson_id: int):
+    """Traduz as falas e regenera resumo/vocabulário em segundo plano."""
+    global _processing_stage
+    try:
+        _job_update(active=True, lesson_id=lesson_id, phase="translating", block=0, total_blocks=0,
+                    lines_done=0, lines_total=0, preview=[])
+        try:
+            _translate_lesson_transcripts(lesson_id)
+        except Exception as e:
+            print(f"[API] Erro ao traduzir transcrição: {e}")
+
+        _job_update(phase="summarizing", preview=[])
+        _processing_stage = "Gerando resumo e vocabulário..."
+        lesson = get_lesson(lesson_id)
+        transcripts = get_lesson_transcripts(lesson_id)
+        ai_data = generate_study_material(transcripts, lesson_title=lesson.get("title", "Aula de Inglês"))
+        save_lesson_ai_analysis(
+            lesson_id=lesson_id,
+            summary=ai_data["summary"],
+            vocabulary_json=ai_data["vocabulary_json"],
+            grammar_notes=ai_data["grammar_notes"]
+        )
+    except Exception as e:
+        print(f"[API] Erro ao regenerar material da aula #{lesson_id}: {e}")
+    finally:
+        _processing_stage = ""
+        _job_update(active=False, phase="done", preview=[])
 
 
 def _process_lesson_background(lesson_id: int, audio_filename: str):
@@ -93,6 +148,7 @@ def _process_lesson_background(lesson_id: int, audio_filename: str):
     finally:
         _is_processing = False
         _processing_stage = ""
+        _job_update(active=False, phase="done", preview=[])
 
 
 @api_bp.route("/recording/start", methods=["POST"])
@@ -185,6 +241,7 @@ def recording_status():
         "is_recording": is_rec,
         "is_processing": _is_processing,
         "processing_stage": _processing_stage,
+        "job": _job_snapshot(),
         "active_lesson_id": _active_lesson_id,
         "elapsed_seconds": round(elapsed, 1),
         "volume_level": round(audio_recorder.current_volume, 2),
@@ -297,23 +354,14 @@ def regenerate_ai_material(lesson_id: int):
     if not transcripts:
         return jsonify({"success": False, "message": "Aula não possui transcrições."}), 400
 
-    try:
-        _translate_lesson_transcripts(lesson_id)
-    except Exception as e:
-        print(f"[API] Erro ao traduzir transcrição: {e}")
-    finally:
-        global _processing_stage
-        _processing_stage = ""
+    if _job_snapshot()["active"]:
+        return jsonify({"success": False, "message": "Já existe uma tradução/regeneração em andamento."}), 409
 
-    ai_data = generate_study_material(transcripts, lesson_title=lesson.get("title", "Aula de Inglês"))
-    save_lesson_ai_analysis(
-        lesson_id=lesson_id,
-        summary=ai_data["summary"],
-        vocabulary_json=ai_data["vocabulary_json"],
-        grammar_notes=ai_data["grammar_notes"]
-    )
+    _job_update(active=True, lesson_id=lesson_id, phase="translating", block=0, total_blocks=0,
+                lines_done=0, lines_total=0, preview=[])
+    threading.Thread(target=_regenerate_background, args=(lesson_id,), daemon=True).start()
 
-    return jsonify({"success": True, "message": "Material de estudo regenerado com sucesso!", "ai_data": ai_data})
+    return jsonify({"success": True, "message": "Regeneração iniciada.", "lesson_id": lesson_id})
 
 
 @api_bp.route("/lessons/<int:lesson_id>/export_markdown", methods=["GET"])

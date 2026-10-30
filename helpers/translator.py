@@ -30,21 +30,63 @@ def _ollama(text: str, source: str, target: str) -> str:
     )
     r = httpx.post(
         f"{OLLAMA_BASE_URL}/api/generate",
-        json={"model": DEFAULT_OLLAMA_MODEL, "prompt": prompt, "stream": False, "think": False,
-              "options": {"temperature": 0.1}},
+        json={
+            "model": DEFAULT_OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "options": {"temperature": 0.1},
+        },
         timeout=60.0,
     )
     r.raise_for_status()
     out = r.json().get("response", "").strip()
-    if "</think>" in out:  # modelos com raciocínio (ex.: qwen3) podem emitir <think>...</think>
+    if (
+        "</think>" in out
+    ):  # modelos com raciocínio (ex.: qwen3) podem emitir <think>...</think>
         out = out.split("</think>", 1)[1].strip()
     return out
 
 
 _PT_HINTS = {
-    "o", "a", "os", "as", "de", "do", "da", "que", "não", "nao", "um", "uma", "para", "com",
-    "eu", "você", "voce", "é", "e", "em", "se", "por", "mais", "como", "casa", "olá", "ola",
-    "obrigado", "bom", "dia", "tudo", "bem", "isso", "esse", "esta", "está", "estou", "muito",
+    "o",
+    "a",
+    "os",
+    "as",
+    "de",
+    "do",
+    "da",
+    "que",
+    "não",
+    "nao",
+    "um",
+    "uma",
+    "para",
+    "com",
+    "eu",
+    "você",
+    "voce",
+    "é",
+    "e",
+    "em",
+    "se",
+    "por",
+    "mais",
+    "como",
+    "casa",
+    "olá",
+    "ola",
+    "obrigado",
+    "bom",
+    "dia",
+    "tudo",
+    "bem",
+    "isso",
+    "esse",
+    "esta",
+    "está",
+    "estou",
+    "muito",
 }
 
 
@@ -111,7 +153,12 @@ def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
             res = _google(text, source, target)
         elif direction == "auto":
             source = res["detected"]
-        result = {"translation": res["translation"], "source": source, "target": target, "engine": "google"}
+        result = {
+            "translation": res["translation"],
+            "source": source,
+            "target": target,
+            "engine": "google",
+        }
         _cache[key] = result
         return result
     except Exception as e:
@@ -127,7 +174,12 @@ def translate(text: str, direction: str = "auto") -> Dict[str, Any]:
 
     # 2) Ollama local (melhor qualidade que a memória de tradução para frases curtas)
     try:
-        result = {"translation": _ollama(text, source, target), "source": source, "target": target, "engine": "ollama"}
+        result = {
+            "translation": _ollama(text, source, target),
+            "source": source,
+            "target": target,
+            "engine": "ollama",
+        }
         _cache[key] = result
         return result
     except Exception as e:
@@ -157,18 +209,26 @@ def _ollama_batch(lines: List[str]) -> List[str]:
     )
     r = httpx.post(
         f"{OLLAMA_BASE_URL}/api/generate",
-        json={"model": DEFAULT_OLLAMA_MODEL, "prompt": prompt, "stream": False,
-              "think": False, "format": "json", "options": {"temperature": 0.1}},
+        json={
+            "model": DEFAULT_OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "think": False,
+            "format": "json",
+            "options": {"temperature": 0.1},
+        },
         timeout=180.0,
     )
     r.raise_for_status()
     items = json.loads(r.json().get("response", "{}")).get("translations", [])
     if len(items) != len(lines):
-        raise RuntimeError("Ollama devolveu um número de traduções diferente do enviado")
+        raise RuntimeError(
+            "Ollama devolveu um número de traduções diferente do enviado"
+        )
     return [str(i).strip() for i in items]
 
 
-def translate_batch(lines: List[str], progress=None) -> List[str]:
+def translate_batch(lines: List[str], progress=None, on_block=None) -> List[str]:
     """Traduz EN->PT uma lista de linhas, preservando a ordem. Falhas viram string vazia."""
     global _google_blocked_until
     results = [""] * len(lines)
@@ -187,6 +247,8 @@ def translate_batch(lines: List[str], progress=None) -> List[str]:
     for n, idxs in enumerate(chunks):
         batch = [lines[i] for i in idxs]
         out = None
+        if on_block:
+            on_block(n + 1, len(chunks), batch)
 
         if time.time() >= _google_blocked_until:
             try:
