@@ -1,8 +1,36 @@
-﻿.venv/
+# Ambiente virtual e cache Python
+.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# Configurações e segredos locais
 .env
+storage/google_translate_usage.json
+
+# Armazenamento de aulas (áudios, capturas de tela e banco de dados SQLite)
 storage/
 *.db
+*.sqlite3
+
+# Arquivos de mídia e legendas locais de teste
+*.mp4
+*.mkv
+*.avi
+*.wav
+*.mp3
+*.srt
+
+# Configurações de IDEs e editores
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# Sistema operacional
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs
+*.log

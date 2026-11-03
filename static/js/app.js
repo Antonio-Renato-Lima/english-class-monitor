@@ -673,7 +673,10 @@ function swapTranslation() {
 document.addEventListener("DOMContentLoaded", () => {
   startLiveCaptionsPolling();
   document.getElementById("translate-input").addEventListener("keydown", e => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) runTranslate();
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      runTranslate();
+    }
   });
 });
 
