@@ -92,7 +92,8 @@ def transcribe_audio_file(filepath: str) -> List[Dict[str, Any]]:
             task="transcribe",
             beam_size=5,
             vad_filter=True,  # Remove silêncios para acelerar
-            vad_parameters=dict(min_silence_duration_ms=500)
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt="Do not censor or mask words with asterisks. Transcribe all spoken words verbatim, including swear words, profanity, and informal slang."
         )
         # Consome o gerador para garantir que a inferência ocorra dentro do bloco try
         seg_list = list(segments)
@@ -105,7 +106,8 @@ def transcribe_audio_file(filepath: str) -> List[Dict[str, Any]]:
             task="transcribe",
             beam_size=5,
             vad_filter=True,
-            vad_parameters=dict(min_silence_duration_ms=500)
+            vad_parameters=dict(min_silence_duration_ms=500),
+            initial_prompt="Do not censor or mask words with asterisks. Transcribe all spoken words verbatim, including swear words, profanity, and informal slang."
         )
         seg_list = list(segments)
 

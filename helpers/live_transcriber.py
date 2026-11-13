@@ -68,6 +68,7 @@ class LiveTranscriber:
                     vad_filter=True,
                     vad_parameters=dict(min_silence_duration_ms=300),
                     condition_on_previous_text=False,
+                    initial_prompt="Do not censor or mask words with asterisks. Transcribe all spoken words verbatim, including swear words, profanity, and informal slang."
                 )
                 text = " ".join(s.text.strip() for s in segments).strip()
         except Exception as e:

@@ -26,7 +26,8 @@ def _ollama(text: str, source: str, target: str) -> str:
     src = _LANG_NAMES.get(source, "the source language")
     tgt = _LANG_NAMES.get(target, target)
     prompt = (
-        f"Translate the following text from {src} to {tgt}. "
+        f"Translate accurately and verbatim from {src} to {tgt}. "
+        "Do not censor, omit, or mask any words with asterisks (preserve all slang, informal words, and profanity in full context). "
         f"Reply with ONLY the translation, nothing else.\n\n{text}"
     )
     r = httpx.post(
@@ -216,7 +217,7 @@ def _google_batch(lines: List[str]) -> List[str]:
 def _ollama_batch(lines: List[str]) -> List[str]:
     numbered = "\n".join(f"{i + 1}. {l}" for i, l in enumerate(lines))
     prompt = (
-        "Translate each numbered English line to Brazilian Portuguese. "
+        "Translate each numbered English line to Brazilian Portuguese verbatim without censoring, omitting, or masking any words with asterisks. "
         'Reply ONLY with JSON in the form {"translations": ["...", "..."]} '
         f"with exactly {len(lines)} strings, in the same order.\n\n{numbered}"
     )
