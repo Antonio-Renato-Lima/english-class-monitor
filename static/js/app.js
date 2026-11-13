@@ -566,6 +566,7 @@ function escapeHtml(text) {
 // ===== Legendas ao Vivo =====
 let lastCaptionId = 0;
 let liveLoopStarted = false;
+let pipWindow = null;
 
 function startLiveCaptionsPolling() {
   if (liveLoopStarted) return;
@@ -581,41 +582,202 @@ function startLiveCaptionsPolling() {
 }
 
 function updateLiveBadge(status) {
-  const badge = document.getElementById("live-status-badge");
-  if (!badge) return;
-  badge.textContent = status === "listening" ? "🟢 Ouvindo"
+  const text = status === "listening" ? "🟢 Ouvindo"
     : status === "loading" ? "⏳ Carregando modelo..."
     : "Aguardando aula";
+
+  const badge = document.getElementById("live-status-badge");
+  if (badge) badge.textContent = text;
+
+  if (pipWindow && !pipWindow.closed) {
+    const pipBadge = pipWindow.document.getElementById("pip-status-badge");
+    if (pipBadge) pipBadge.textContent = text;
+  }
+}
+
+function createCaptionElement(c, isLatest) {
+  const line = document.createElement("div");
+  line.className = "caption-line" + (isLatest ? " latest" : "");
+  line.title = "Clique para traduzir no tradutor rápido";
+
+  const trHtml = c.translation
+    ? `<div class="caption-tr">${escapeHtml(c.translation)}</div>`
+    : "";
+
+  line.innerHTML = `
+    <span class="caption-time">${formatSeconds(c.time)}</span>
+    <div class="caption-body">
+      <div class="caption-en">${escapeHtml(c.text)}</div>
+      ${trHtml}
+    </div>
+  `;
+
+  line.addEventListener("click", () => {
+    const transInput = document.getElementById("translate-input");
+    const transDir = document.getElementById("translate-direction");
+    if (transInput) transInput.value = c.text;
+    if (transDir) transDir.value = "en-pt";
+    runTranslate();
+  });
+
+  return line;
 }
 
 function appendCaptions(captions) {
   const box = document.getElementById("live-captions");
-  const empty = box.querySelector(".live-empty");
-  if (empty) empty.remove();
-  box.querySelectorAll(".caption-line.latest").forEach(el => el.classList.remove("latest"));
+  const pipBox = (pipWindow && !pipWindow.closed)
+    ? pipWindow.document.getElementById("pip-captions")
+    : null;
+
+  if (box) {
+    const empty = box.querySelector(".live-empty");
+    if (empty) empty.remove();
+    box.querySelectorAll(".caption-line.latest").forEach(el => el.classList.remove("latest"));
+  }
+
+  if (pipBox) {
+    const pipEmpty = pipBox.querySelector(".live-empty");
+    if (pipEmpty) pipEmpty.remove();
+    pipBox.querySelectorAll(".caption-line.latest").forEach(el => el.classList.remove("latest"));
+  }
 
   captions.forEach((c, i) => {
     lastCaptionId = Math.max(lastCaptionId, c.id);
-    const line = document.createElement("div");
-    line.className = "caption-line" + (i === captions.length - 1 ? " latest" : "");
-    line.title = "Clique para traduzir";
-    line.innerHTML = `<span class="caption-time">${formatSeconds(c.time)}</span><span>${escapeHtml(c.text)}</span>`;
-    line.addEventListener("click", () => {
-      document.getElementById("translate-input").value = c.text;
-      document.getElementById("translate-direction").value = "en-pt";
-      runTranslate();
-    });
-    box.appendChild(line);
+    const isLatest = (i === captions.length - 1);
+
+    if (box) {
+      box.appendChild(createCaptionElement(c, isLatest));
+    }
+
+    if (pipBox) {
+      pipBox.appendChild(createCaptionElement(c, isLatest));
+    }
   });
 
-  if (document.getElementById("live-autoscroll").checked) {
+  const autoScroll = document.getElementById("live-autoscroll");
+  if (box && (!autoScroll || autoScroll.checked)) {
     box.scrollTop = box.scrollHeight;
+  }
+
+  if (pipBox) {
+    pipBox.scrollTop = pipBox.scrollHeight;
   }
 }
 
 function clearLiveCaptions() {
-  document.getElementById("live-captions").innerHTML =
-    '<p class="live-empty">Tela limpa. Novas falas aparecerão aqui.</p>';
+  const emptyHtml = '<p class="live-empty">Tela limpa. Novas falas aparecerão aqui.</p>';
+  const box = document.getElementById("live-captions");
+  if (box) box.innerHTML = emptyHtml;
+
+  if (pipWindow && !pipWindow.closed) {
+    const pipBox = pipWindow.document.getElementById("pip-captions");
+    if (pipBox) pipBox.innerHTML = emptyHtml;
+  }
+}
+
+// Janela Flutuante Always-on-Top (sobreposta ao Zoom)
+async function toggleFloatingCaptions() {
+  if (pipWindow && !pipWindow.closed) {
+    pipWindow.close();
+    pipWindow = null;
+    updatePipButton(false);
+    return;
+  }
+
+  // 1. Tenta a API nativa Document Picture-in-Picture (Chrome / Edge 116+)
+  if ("documentPictureInPicture" in window) {
+    try {
+      pipWindow = await window.documentPictureInPicture.requestWindow({
+        width: 520,
+        height: 330,
+      });
+
+      // Copia estilos para a janela Picture-in-Picture
+      [...document.styleSheets].forEach(styleSheet => {
+        try {
+          if (styleSheet.href) {
+            const link = document.createElement("link");
+            link.rel = "stylesheet";
+            link.href = styleSheet.href;
+            pipWindow.document.head.appendChild(link);
+          } else if (styleSheet.cssRules) {
+            const style = document.createElement("style");
+            [...styleSheet.cssRules].forEach(rule => {
+              style.appendChild(document.createTextNode(rule.cssText));
+            });
+            pipWindow.document.head.appendChild(style);
+          }
+        } catch (e) {
+          console.warn("Aviso ao copiar folha de estilo:", e);
+        }
+      });
+
+      pipWindow.document.title = "Legendas ao Vivo • Zoom Overlay";
+      pipWindow.document.body.className = "pip-mode";
+
+      const currentContent = document.getElementById("live-captions")
+        ? document.getElementById("live-captions").innerHTML
+        : '<p class="live-empty">Aguardando início da aula...</p>';
+
+      pipWindow.document.body.innerHTML = `
+        <div class="pip-container">
+          <div class="pip-header">
+            <div class="pip-title">
+              <span>💬</span>
+              <span>Legendas ao Vivo & Tradução</span>
+              <span class="preview-badge" id="pip-status-badge">Pronto</span>
+            </div>
+            <div class="pip-controls">
+              <button class="btn-action pip-btn" id="pip-clear-btn" style="padding:0.25rem 0.6rem; font-size:0.75rem;" title="Limpar legendas">🧹 Limpar</button>
+            </div>
+          </div>
+          <div class="live-captions pip-captions" id="pip-captions">
+            ${currentContent}
+          </div>
+        </div>
+      `;
+
+      const pipClear = pipWindow.document.getElementById("pip-clear-btn");
+      if (pipClear) {
+        pipClear.addEventListener("click", () => clearLiveCaptions());
+      }
+
+      pipWindow.addEventListener("pagehide", () => {
+        pipWindow = null;
+        updatePipButton(false);
+      });
+
+      updatePipButton(true);
+      showToast("🪟 Janela flutuante aberta! Ela fica fixa por cima do Zoom.");
+      return;
+    } catch (e) {
+      console.warn("Falha ao abrir Document PiP, usando popup de fallback:", e);
+    }
+  }
+
+  // 2. Fallback para outros navegadores (Janela Pop-up destacada)
+  const popup = window.open(
+    "/floating",
+    "ZoomCaptionsPopup",
+    "width=540,height=340,menubar=no,toolbar=no,location=no,status=no,resizable=yes"
+  );
+  if (popup) {
+    showToast("Janela de legendas aberta! Arraste-a para a frente da sua aula.");
+  } else {
+    showToast("Permita pop-ups no navegador para abrir a janela flutuante.", "error");
+  }
+}
+
+function updatePipButton(isOpen) {
+  const btn = document.getElementById("btn-pip");
+  if (!btn) return;
+  if (isOpen) {
+    btn.classList.add("btn-pip-active");
+    btn.innerHTML = "🪟 Fechar Flutuante";
+  } else {
+    btn.classList.remove("btn-pip-active");
+    btn.innerHTML = "🪟 Flutuante (Zoom)";
+  }
 }
 
 // ===== Tradutor =====

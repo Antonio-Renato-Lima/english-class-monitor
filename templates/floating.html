@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Legendas ao Vivo • English Class Monitor</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body {
+      margin: 0;
+      padding: 0.75rem;
+      background: rgba(11, 15, 25, 0.96);
+      height: 100vh;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .floating-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 0.5rem;
+    }
+    .floating-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    .floating-body {
+      flex: 1;
+      overflow-y: auto;
+      padding-right: 0.35rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="floating-header">
+    <div class="floating-title">
+      <span>💬</span>
+      <span>Legendas ao Vivo & Tradução</span>
+      <span class="preview-badge" id="live-status-badge">Aguardando aula</span>
+    </div>
+    <div style="display:flex; gap:0.4rem;">
+      <button class="btn-action" style="padding:0.25rem 0.6rem; font-size:0.75rem;" onclick="clearLiveCaptions()">🧹 Limpar</button>
+    </div>
+  </div>
+
+  <div class="live-captions floating-body" id="live-captions" style="border:none; background:transparent; padding:0; height:100%;">
+    <p class="live-empty">As falas em inglês e a tradução aparecerão aqui em tempo real durante a aula.</p>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

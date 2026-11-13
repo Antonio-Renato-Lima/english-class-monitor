@@ -1115,3 +1115,93 @@ main {
 .job-engine.google { color: #6ee7b7; border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.08); }
 .job-engine.ollama { color: #fcd34d; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.09); }
 .job-engine.failed { color: #fda4af; border-color: rgba(244, 63, 94, 0.4); background: rgba(244, 63, 94, 0.09); }
+
+
+/* ===== Tradução em Tempo Real nas Legendas ===== */
+.caption-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.caption-en {
+  color: var(--text-main);
+  font-size: 1.05rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.caption-tr {
+  font-size: 0.88rem;
+  font-style: italic;
+  color: #a5b4fc;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--accent-indigo);
+  margin-top: 0.15rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* ===== Janela Flutuante Always-on-Top (Zoom Overlay) ===== */
+body.pip-mode {
+  margin: 0;
+  padding: 0.65rem;
+  background: rgba(11, 15, 25, 0.96) !important;
+  color: var(--text-main);
+  font-family: 'Outfit', system-ui, sans-serif;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.pip-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.pip-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 0.45rem;
+  margin-bottom: 0.45rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.pip-title {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 600;
+}
+
+.pip-captions {
+  flex: 1;
+  height: auto !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0.25rem 0.25rem 0 0 !important;
+}
+
+.pip-captions .caption-line {
+  font-size: 0.95rem;
+  padding: 0.35rem 0.45rem;
+}
+
+.pip-captions .caption-en {
+  font-size: 0.95rem;
+}
+
+.pip-captions .caption-tr {
+  font-size: 0.84rem;
+}
+
+.btn-pip-active {
+  background: var(--accent-indigo) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-indigo) !important;
+}

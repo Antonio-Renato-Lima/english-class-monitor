@@ -76,11 +76,21 @@ class LiveTranscriber:
 
         if not text:
             return
+
+        translation = ""
+        try:
+            from helpers.translator import translate
+            tr_res = translate(text, "en-pt")
+            translation = tr_res.get("translation", "")
+        except Exception as e:
+            print(f"[LiveTranscriber] Aviso na tradução em tempo real: {e}")
+
         with self._lock:
             self._captions.append({
                 "id": len(self._captions) + 1,
                 "time": round(start_offset, 1),
                 "text": text,
+                "translation": translation,
             })
 
     def _run(self):

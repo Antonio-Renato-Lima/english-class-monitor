@@ -118,7 +118,10 @@
           </div>
           <div class="preview-meta">
             <label style="cursor:pointer;"><input type="checkbox" id="live-autoscroll" checked> Rolagem automática</label>
-            <button class="btn-action" onclick="clearLiveCaptions()">🧹 Limpar tela</button>
+            <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+              <button class="btn-action" id="btn-pip" onclick="toggleFloatingCaptions()" title="Abrir janela flutuante Always-on-Top sobreposta ao Zoom">🪟 Flutuante (Zoom)</button>
+              <button class="btn-action" onclick="clearLiveCaptions()">🧹 Limpar tela</button>
+            </div>
           </div>
         </div>
 
